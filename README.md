@@ -9,7 +9,7 @@ Elmish Store addresses these issues by enabling more targeted data management an
 
 ## Usage
 
-The package consists of two parts: 
+The package consists of two parts:
 - **Creating the store:** Functions that accept the user's program definition and create a store consumable by custom React hooks.
 - **Selectors:** Custom hooks that allow selecting parts of the model with the assurance that components will re-render only if the selected part changes. These come in two variants:
   - `useSelector`: This expects a stable selector function and uses reference equality to compare the results with the previous one.
@@ -80,5 +80,9 @@ let private CounterSum () =
     prop.text $"Counters Sum: %i{counter1 + counter2}"
   ]
 ```
+
+This GIF illustrates the example (notice how React DevTools can be utilized to inspect and debug state changes):
+
+![Example usage of Elmish Store](assets/example.gif)
 
 For a comprehensive understanding, explore the `ElmishStore.Example` directory within this repository.
