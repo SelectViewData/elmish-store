@@ -8,7 +8,10 @@
       <Company>SelectView Data Solutions</Company>
       <Version>0.1.0</Version>
       <TargetFramework>net8.0</TargetFramework>
-      <PackageReadmeFile>README.md</PackageReadmeFile>
+      <PackageReadmeFile>readme.md</PackageReadmeFile>
+      <RepositoryUrl>https://github.com/SelectViewData/elmish-store</RepositoryUrl>
+      <RepositoryType>git</RepositoryType>
+      <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
   <PropertyGroup>
       <NpmDependencies>
@@ -22,7 +25,7 @@
   </ItemGroup>
   <ItemGroup>
       <Content Include="*.fsproj; *.fs" Exclude="**\*.fs.js" PackagePath="fable\" />
-      <None Include="..\..\readme.md" Pack="true" PackagePath="\"/>
+      <Content Include="..\..\readme.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Fable.Elmish" Version="4.1.0" />
