@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+      <PackageId>Elmish.Store</PackageId>
+      <Description>A library that merges Elmish and React, providing an external store with efficient, selective component rendering capabilities.</Description>
+      <PackageTags>fsharp;fable;react;elmish</PackageTags>
+      <Authors>Łukasz Krzywizna</Authors>
+      <Company>SelectView Data Solutions</Company>
+      <Version>0.1.0</Version>
+      <TargetFramework>net8.0</TargetFramework>
+      <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <PropertyGroup>
+      <NpmDependencies>
+          <NpmPackage Name="use-sync-external-store" Version="&gt;= 1.0.0 &lt; 2.0.0" ResolutionStrategy="Max" />
+      </NpmDependencies>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="UseSyncExternalStore.fs" />
+    <Compile Include="ElmishStore.fs" />
+    <Compile Include="Hooks.fs" />
+  </ItemGroup>
+  <ItemGroup>
+      <Content Include="*.fsproj; *.fs" Exclude="**\*.fs.js" PackagePath="fable\" />
+      <None Include="..\..\readme.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Fable.Elmish" Version="4.1.0" />
+    <PackageReference Include="Feliz" Version="2.7.0" />
+    <PackageReference Include="Feliz.CompilerPlugins" Version="2.2.0" />
+  </ItemGroup>
+</Project>

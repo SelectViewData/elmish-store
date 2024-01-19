@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+    </PropertyGroup>
+    <ItemGroup>
+        <Content Include="..\..\tailwind.config.js">
+          <Link>tailwind.config.js</Link>
+        </Content>
+        <Content Include="..\..\vite.config.js">
+          <Link>vite.config.js</Link>
+        </Content>
+        <Content Include="..\..\postcss.config.js">
+          <Link>postcss.config.js</Link>
+        </Content>
+        <Content Include="..\..\package.json">
+          <Link>package.json</Link>
+        </Content>
+        <Content Include="..\..\yarn.lock">
+          <Link>yarn.lock</Link>
+        </Content>
+        <Content Include="index.html" />
+        <Compile Include="Model.fs" />
+        <Compile Include="ModelStore.fs" />
+        <Compile Include="View.fs" />
+        <Compile Include="App.fs" />
+        <Content Include="paket.references" />
+    </ItemGroup>
+    <ItemGroup>
+      <EmbeddedResource Remove="public\**" />
+    </ItemGroup>
+    <ItemGroup>
+      <PackageReference Include="Fable.Elmish.Debugger" Version="4.0.0" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\ElmishStore\ElmishStore.fsproj" />
+    </ItemGroup>
+</Project>
