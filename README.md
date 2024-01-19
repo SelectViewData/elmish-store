@@ -84,7 +84,7 @@ let private CounterSum () =
   ]
 ```
 
-This GIF illustrates the example (notice how React DevTools reflects re-rendering based solely on selector state changes:
+This GIF illustrates the example (notice how React DevTools reflects re-rendering based solely on selector state changes):
 
 ![Example usage of Elmish Store](assets/example.gif)
 
