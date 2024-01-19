@@ -81,4 +81,4 @@ let private CounterSum () =
   ]
 ```
 
-For more examples, check out the `ElmishStore.Example` project.
+For a comprehensive understanding, explore the ElmishStore.Example directory within this repository.
