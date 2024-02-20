@@ -1,6 +1,6 @@
 # Elmish Store
 
-> 📣 **Coming Soon:** A comprehensive blog post detailing the Elmish Store project! Stay tuned for an in-depth look at how this library enhances F# and React integration. 🚀
+> For a more detailed motivation and guide on how this works, check out this [article on optimizing F# and React integration with Elmish Store](https://dev.to/lkrzywizna/optimizing-f-and-react-integration-with-elmish-store-a-guide-to-efficient-state-management-316m) 🚀.
 
 A library that merges Elmish with React, offering an external store for efficient and selective component rendering.
 
