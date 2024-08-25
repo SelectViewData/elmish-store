@@ -27,7 +27,6 @@ type internal ReactBindings =
     ) : 'a =
     jsNative
 
-  [<Hook>]
   static member inline useSyncExternalStoreWithSelector
     (
       subscribe: UseSyncExternalStoreSubscribe,
