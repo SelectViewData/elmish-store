@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
@@ -31,6 +31,7 @@
     </ItemGroup>
     <ItemGroup>
       <PackageReference Include="Fable.Elmish.Debugger" Version="4.0.0" />
+      <PackageReference Include="Feliz" Version="2.8.0" />
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\ElmishStore\ElmishStore.fsproj" />

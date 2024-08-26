@@ -6,134 +6,277 @@ open Fable.Core
 open ElmishStore
 open System.Collections.Generic
 
-type ElmishStore<'model, 'msg> = {
-  GetModel: unit -> 'model
-  Dispatch: 'msg -> unit
-  Subscribe: UseSyncExternalStoreSubscribe
+type ElmishStore<'Model, 'Msg> = {
+    GetModel: unit -> 'Model
+    Dispatch: 'Msg -> unit
+    Subscribe: UseSyncExternalStoreSubscribe
 }
 
-type private StoreState<'arg, 'model, 'msg> = {
-  Store: ElmishStore<'model, 'msg>
-  SetTermination: bool -> unit
+type private StoreState<'Arg, 'Model, 'Msg> = {
+    Store: ElmishStore<'Model, 'Msg>
+    SetTermination: bool -> unit
 }
 
-module ElmishStore =
+type internal StoreKey<'T when 'T : equality> = 'T
 
-  let mutable private stores: Dictionary<string, obj> = Dictionary<string, obj>()
+type IElmishProgramBasedStoreInitializer<'StoreKey when StoreKey<'StoreKey>> =
+    abstract CreateStore :
+        program: Program<unit, 'Model, 'Msg, unit> *
+        storeKey: 'StoreKey ->
+            ElmishStore<'Model, 'Msg>
+    abstract CreateStoreWithArg :
+        program: Program<'Arg, 'Model, 'Msg, unit> *
+        storeKey: 'StoreKey *
+        arg: 'Arg ->
+            ElmishStore<'Model, 'Msg>
 
-  let private initiate
-    uniqueName
-    (arg: 'arg)
-    (program: Program<'arg, 'model, 'msg, unit>)
-    (getState: unit -> 'model option)
-    =
+type IElmishFunctionsBasedStoreInitializer<'StoreKey when StoreKey<'StoreKey>> =
+    abstract CreateStoreWithFunctions :
+        init: (unit -> 'Model * Cmd<'Msg>) *
+        update: ('Msg -> 'Model -> 'Model * Cmd<'Msg>) *
+        storeKey: 'StoreKey ->
+            ElmishStore<'Model, 'Msg>
+    abstract CreateStoreWithFunctionsAndArg :
+        init: ('Arg -> 'Model * Cmd<'Msg>) *
+        update: ('Msg -> 'Model -> 'Model * Cmd<'Msg>) *
+        storeKey: 'StoreKey *
+        arg: 'Arg ->
+            ElmishStore<'Model, 'Msg>
 
-    let mutable state = getState ()
-    let mutable finalDispatch = None
-    let mutable shouldTerminate = false
+type IElmishStoreInitializer<'StoreKey when StoreKey<'StoreKey>> =
+    inherit IElmishFunctionsBasedStoreInitializer<'StoreKey>
+    inherit IElmishProgramBasedStoreInitializer<'StoreKey>
 
-    let setTermination should = shouldTerminate <- should
+type IElmishStoreAccessor<'StoreKey when StoreKey<'StoreKey>> =
+    abstract GetStore<'Model, 'Msg when StoreKey<'StoreKey>> :
+        storeKey: 'StoreKey -> ElmishStore<'Model, 'Msg>
+    abstract TryGetStore<'Model, 'Msg when StoreKey<'StoreKey>> :
+        storeKey: 'StoreKey -> ElmishStore<'Model, 'Msg> option
 
-    let dispatch msg =
-      match finalDispatch with
-      | Some finalDispatch -> finalDispatch msg
-      | None -> failwith "You're using initial dispatch. That shouldn't happen."
+type IElmishStoresHost<'StoreKey when StoreKey<'StoreKey>> =
+    inherit IElmishStoreInitializer<'StoreKey>
+    inherit IElmishStoreAccessor<'StoreKey>
 
-    let subscribers = ResizeArray<unit -> unit>()
 
-    let subscribe callback =
-      subscribers.Add(callback)
-      fun () -> subscribers.Remove(callback) |> ignore
+type ElmishStoresHost<'StoreKey when StoreKey<'StoreKey>>() =
 
-    let mapSetState setState model dispatch =
-      setState model dispatch
-      let oldModel = state
-      state <- Some model
-      finalDispatch <- Some dispatch
-      // Skip re-renders if model hasn't changed
-      if not (obj.ReferenceEquals(model, oldModel)) then
-        subscribers |> Seq.iter (fun callback -> callback ())
+    let mutable stores: Dictionary<'StoreKey, obj> = Dictionary<'StoreKey, obj>()
 
-    let mapInit userInit arg =
-      if state.IsSome then state.Value, Cmd.none else userInit arg
+    let initiate
+        storeKey
+        (arg: 'Arg)
+        (program: Program<'Arg, 'Model, 'Msg, unit>)
+        (getState: unit -> 'Model option)
+        =
+        let mutable state = getState ()
+        let mutable finalDispatch = None
+        let mutable shouldTerminate = false
 
-    let mapTermination (predicate, terminate) =
-      let pred msg = predicate msg || shouldTerminate
-      pred, terminate
+        let setTermination should = shouldTerminate <- should
 
-    program
-    |> Program.map mapInit id id mapSetState id mapTermination
-    |> Program.runWith arg
+        let dispatch msg =
+            match finalDispatch with
+            | Some finalDispatch -> finalDispatch msg
+            | None -> failwith "You're using initial dispatch. That shouldn't happen."
 
-    let getState () =
-      match state with
-      | Some state -> state
-      | None -> failwith "State is not initialized. That shouldn't happen."
+        let subscribers = ResizeArray<unit -> unit>()
 
-    let store = {
-      GetModel = getState
-      Dispatch = dispatch
-      Subscribe = UseSyncExternalStoreSubscribe subscribe
-    }
+        let subscribe callback =
+            subscribers.Add(callback)
+            fun () -> subscribers.Remove(callback) |> ignore
 
-    let storeState = {
-      Store = store
-      SetTermination = setTermination
-    }
+        let mapSetState setState model dispatch =
+            setState model dispatch
+            let oldModel = state
+            state <- Some model
+            finalDispatch <- Some dispatch
+            // Skip re-renders if model hasn't changed
+            if not (obj.ReferenceEquals(model, oldModel)) then
+                subscribers |> Seq.iter (fun callback -> callback ())
 
-    stores[uniqueName] <- box storeState
-    store
+        let mapInit userInit arg =
+            if state.IsSome then state.Value, Cmd.none else userInit arg
 
-  let createStoreWith uniqueName (arg: 'arg) (program: Program<'arg, 'model, 'msg, unit>) =
+        let mapTermination (predicate, terminate) =
+            let pred msg = predicate msg || shouldTerminate
+            pred, terminate
 
-    let getState =
-      if stores.ContainsKey(uniqueName) then
-        let storeState = stores[uniqueName] |> unbox<StoreState<'arg, 'model, 'msg>>
-        storeState.SetTermination true
-        (fun () -> Some(storeState.Store.GetModel()))
-      else
-        (fun () -> None)
+        program
+        |> Program.map mapInit id id mapSetState id mapTermination
+        |> Program.runWith arg
 
-    initiate uniqueName arg program getState
+        let getState () =
+            match state with
+            | Some state -> state
+            | None -> failwith "State is not initialized. That shouldn't happen."
 
-  let inline createStore uniqueName program : ElmishStore<'model, 'msg> =
-    createStoreWith uniqueName () program
+        let store = {
+            GetModel = getState
+            Dispatch = dispatch
+            Subscribe = UseSyncExternalStoreSubscribe subscribe
+        }
+
+        let storeState = {
+            Store = store
+            SetTermination = setTermination
+        }
+
+        stores[storeKey] <- box storeState
+        store
+
+    let createStoreWith storeKey (arg: 'Arg) (program: Program<'Arg, 'Model, 'Msg, unit>) =
+
+        let getState =
+            if stores.ContainsKey(storeKey) then
+                let storeState = stores[storeKey] |> unbox<StoreState<'Arg, 'Model, 'Msg>>
+                storeState.SetTermination true
+                (fun () -> Some(storeState.Store.GetModel()))
+            else
+                (fun () -> None)
+
+        initiate storeKey arg program getState
+
+    let createStore storeKey program : ElmishStore<'Model, 'Msg> =
+        createStoreWith storeKey () program
+
+    interface IElmishStoresHost<'StoreKey> with
+
+        member this.CreateStore(program: Program<unit, 'Model, 'Msg, unit>, storeKey: StoreKey<'StoreKey>) =
+            createStore storeKey program
+
+        member this.CreateStoreWithArg(program: Program<'Arg, 'Model, 'Msg, unit>, storeKey, arg) =
+            createStoreWith storeKey arg program
+
+        member this.CreateStoreWithFunctions(
+                init: unit -> 'Model * Cmd<'Msg>,
+                update: 'Msg -> 'Model -> 'Model * Cmd<'Msg>,
+                storeKey
+            ) =
+                let program = Program.mkProgram init update (fun _ _ -> ())
+                (this :> IElmishStoresHost<'StoreKey>).CreateStore(program, storeKey)
+
+        member this.CreateStoreWithFunctionsAndArg(
+                init: 'Arg -> 'Model * Cmd<'Msg>,
+                update: 'Msg -> 'Model -> 'Model * Cmd<'Msg>,
+                storeKey,
+                arg: 'Arg
+            ) =
+            let program = Program.mkProgram init update (fun _ _ -> ())
+            (this :> IElmishStoresHost<'StoreKey>).CreateStoreWithArg(program, storeKey, arg)
+
+        member this.GetStore<'Model, 'Msg>(storeKey) =
+            try
+                let storeState =
+                    stores[storeKey] |> unbox<StoreState<_, 'Model, 'Msg>>
+                storeState.Store
+            with
+            | :? KeyNotFoundException as e ->
+                failwithf
+                    $"Elmish Store with key %A{storeKey} hasn't been found. Store has to be created before it can be accessed."
+
+        member this.TryGetStore<'Model, 'Msg> storeKey =
+            match stores.TryGetValue storeKey with
+            | true, s ->
+                let storeState = unbox<StoreState<_, 'Model, 'Msg>> s
+                Some storeState.Store
+            | false, _ -> None
+
+    // The following functions have to be inlined because JS doesn't support methods overloading.
+
+    member inline this.CreateStore(program: Program<unit, 'Model, 'Msg, unit>, storeKey) =
+        (this :> IElmishStoresHost<'StoreKey>).CreateStore(program, storeKey)
+
+    member inline this.CreateStore(program: Program<'Arg, 'Model, 'Msg, unit>, storeKey, arg) =
+        (this :> IElmishStoresHost<'StoreKey>).CreateStoreWithArg(program, storeKey, arg)
+
+    member inline this.CreateStore(
+            init: unit -> 'Model * Cmd<'Msg>,
+            update: 'Msg -> 'Model -> 'Model * Cmd<'Msg>,
+            storeKey
+        ) =
+        (this :> IElmishStoresHost<'StoreKey>).CreateStoreWithFunctions(init, update, storeKey)
+
+    member inline this.CreateStore(
+            init: 'Arg -> 'Model * Cmd<'Msg>,
+            update: 'Msg -> 'Model -> 'Model * Cmd<'Msg>,
+            storeKey,
+            arg: 'Arg
+        ) =
+        let program = Program.mkProgram init update (fun _ _ -> ())
+        (this :> IElmishStoresHost<'StoreKey>).CreateStoreWithArg(program, storeKey, arg)
+
+    member inline this.GetStore storeKey =
+        (this :> IElmishStoreAccessor<'StoreKey>).GetStore storeKey
+
+    member inline this.TryGetStore storeKey =
+        (this :> IElmishStoreAccessor<'StoreKey>).TryGetStore storeKey
+
 
 [<Erase>]
 type ElmishStore =
 
-  static member Create
-    (
-      program: Program<'arg, 'model, 'msg, unit>,
-      arg: 'arg,
-      uniqueName
-    ) : ElmishStore<'model, 'msg> =
-    ElmishStore.createStoreWith uniqueName arg program
+    static member inline create
+        (host: IElmishStoresHost<'StoreKey>)
+        storeKey
+        (program: Program<unit, 'Model, 'Msg, unit>)
+        =
+        host.CreateStore(program, storeKey)
 
-  static member inline Create(program: Program<unit, 'model, 'msg, unit>, uniqueName) =
-    ElmishStore.Create(program, (), uniqueName)
+    static member inline createWithArg
+        (host: IElmishStoresHost<'StoreKey>)
+        storeKey
+        arg
+        (program: Program<'Arg, 'Model, 'Msg, unit>)
+        =
+        host.CreateStoreWithArg(program, storeKey, arg)
 
-  static member inline Create
-    (
-      init: 'arg -> 'model * Cmd<'msg>,
-      update: 'msg -> 'model -> 'model * Cmd<'msg>,
-      arg: 'arg,
-      uniqueName
-    ) =
-    ElmishStore.Create((Program.mkProgram init update (fun _ _ -> ())), arg, uniqueName)
+    static member inline createWithFunctions
+        (host: IElmishStoresHost<'StoreKey>)
+        storeKey
+        (init: unit -> 'Model * Cmd<'Msg>)
+        update
+        =
+        host.CreateStoreWithFunctions(init, update, storeKey)
 
-  static member inline Create
-    (
-      init: unit -> 'model * Cmd<'msg>,
-      update: 'msg -> 'model -> 'model * Cmd<'msg>,
-      uniqueName
-    ) =
-    ElmishStore.Create(Program.mkProgram init update (fun _ _ -> ()), uniqueName)
+    static member inline createWithFunctionsAndArg
+        (host: IElmishStoresHost<'StoreKey>)
+        storeKey
+        arg
+        (init: 'Arg -> 'Model * Cmd<'Msg>)
+        update
+        =
+        host.CreateStoreWithFunctionsAndArg(init, update, storeKey, arg)
 
-  static member inline Create
-    (
-      init: 'model * Cmd<'msg>,
-      update: 'msg -> 'model -> 'model * Cmd<'msg>,
-      uniqueName
-    ) =
-    ElmishStore.Create(Program.mkProgram (fun () -> init) update (fun _ _ -> ()), uniqueName)
+
+[<AutoOpen; Erase>]
+module Extensions =
+
+    type IElmishStoresHost<'StoreKey when StoreKey<'StoreKey>> with
+
+        member inline this.create
+            storeKey
+            (program: Program<unit, 'Model, 'Msg, unit>)
+            =
+            this.CreateStore(program, storeKey)
+
+        member inline this.createWithArg
+            storeKey
+            arg
+            (program: Program<'Arg, 'Model, 'Msg, unit>)
+            =
+            this.CreateStoreWithArg(program, storeKey, arg)
+
+        member inline this.createWithFunctions
+            storeKey
+            (init: unit -> 'Model * Cmd<'Msg>)
+            update
+            =
+            this.CreateStoreWithFunctions(init, update, storeKey)
+
+        member inline this.createWithFunctionsAndArg
+            storeKey
+            arg
+            (init: 'Arg -> 'Model * Cmd<'Msg>)
+            update
+            =
+            this.CreateStoreWithFunctionsAndArg(init, update, storeKey, arg)
