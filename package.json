@@ -1,6 +1,9 @@
 {
     "type": "module",
     "private": true,
+    "engines": {
+        "node": "^20.19.0 || >=22.12.0"
+    },
     "scripts": {
         "prestart": "dotnet tool restore",
         "start": "dotnet fable watch ./src/ElmishStore.Example --outDir ./src/ElmishStore.Example/.fable-build --run vite"

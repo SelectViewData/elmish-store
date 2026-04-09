@@ -6,7 +6,7 @@
       <PackageTags>fsharp;fable;react;elmish</PackageTags>
       <Authors>Łukasz Krzywizna</Authors>
       <Company>SelectView Data Solutions</Company>
-      <Version>0.1.0</Version>
+      <Version>0.2.0</Version>
       <TargetFramework>net8.0</TargetFramework>
       <PackageReadmeFile>readme.md</PackageReadmeFile>
       <RepositoryUrl>https://github.com/SelectViewData/elmish-store</RepositoryUrl>
