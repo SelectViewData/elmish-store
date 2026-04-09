@@ -15,9 +15,10 @@ let store =
   Program.mkProgram init update (fun _ _ -> ())
   #if DEBUG
   |> Program.withConsoleTrace
-  |> Program.withDebugger
-  #endif
+  |> ElmishStore.createStorePostMap "main" Program.withDebugger
+  #else
   |> ElmishStore.createStore "main"
+  #endif
 
 [<Hook>]
 let useSelector (selector: Model -> 'a) = React.useElmishStore (store, selector)

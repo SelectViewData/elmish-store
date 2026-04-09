@@ -26,6 +26,7 @@ module ElmishStore =
     (arg: 'arg)
     (program: Program<'arg, 'model, 'msg, unit>)
     (getState: unit -> 'model option)
+    (postMap: Program<'arg, 'model, 'msg, unit> -> Program<'arg, 'model, 'msg, unit>)
     =
 
     let mutable state = getState ()
@@ -63,6 +64,7 @@ module ElmishStore =
 
     program
     |> Program.map mapInit id id mapSetState id mapTermination
+    |> postMap
     |> Program.runWith arg
 
     let getState () =
@@ -84,7 +86,11 @@ module ElmishStore =
     stores[uniqueName] <- box storeState
     store
 
-  let createStoreWith uniqueName (arg: 'arg) (program: Program<'arg, 'model, 'msg, unit>) =
+  let createStoreWithPostMap
+    (uniqueName: string)
+    (arg: 'arg)
+    (postMap: Program<'arg, 'model, 'msg, unit> -> Program<'arg, 'model, 'msg, unit>)
+    (program: Program<'arg, 'model, 'msg, unit>) =
 
     let getState =
       if stores.ContainsKey(uniqueName) then
@@ -94,10 +100,16 @@ module ElmishStore =
       else
         (fun () -> None)
 
-    initiate uniqueName arg program getState
+    initiate uniqueName arg program getState postMap
 
-  let inline createStore uniqueName program : ElmishStore<'model, 'msg> =
+  let createStoreWith (uniqueName: string) (arg: 'arg) (program: Program<'arg, 'model, 'msg, unit>) =
+    createStoreWithPostMap uniqueName arg id program
+
+  let inline createStore (uniqueName: string) program : ElmishStore<'model, 'msg> =
     createStoreWith uniqueName () program
+
+  let inline createStorePostMap (uniqueName: string) postMap program : ElmishStore<'model, 'msg> =
+    createStoreWithPostMap uniqueName () postMap program
 
 [<Erase>]
 type ElmishStore =
@@ -106,19 +118,36 @@ type ElmishStore =
     (
       program: Program<'arg, 'model, 'msg, unit>,
       arg: 'arg,
-      uniqueName
+      uniqueName: string
     ) : ElmishStore<'model, 'msg> =
     ElmishStore.createStoreWith uniqueName arg program
 
-  static member inline Create(program: Program<unit, 'model, 'msg, unit>, uniqueName) =
+  static member inline Create(program: Program<unit, 'model, 'msg, unit>, uniqueName: string) =
     ElmishStore.Create(program, (), uniqueName)
+
+  static member Create
+    (
+      program: Program<'arg, 'model, 'msg, unit>,
+      arg: 'arg,
+      uniqueName: string,
+      postMap: Program<'arg, 'model, 'msg, unit> -> Program<'arg, 'model, 'msg, unit>
+    ) : ElmishStore<'model, 'msg> =
+    ElmishStore.createStoreWithPostMap uniqueName arg postMap program
+
+  static member inline Create
+    (
+      program: Program<unit, 'model, 'msg, unit>,
+      uniqueName: string,
+      postMap: Program<unit, 'model, 'msg, unit> -> Program<unit, 'model, 'msg, unit>
+    ) =
+    ElmishStore.createStoreWithPostMap uniqueName () postMap program
 
   static member inline Create
     (
       init: 'arg -> 'model * Cmd<'msg>,
       update: 'msg -> 'model -> 'model * Cmd<'msg>,
       arg: 'arg,
-      uniqueName
+      uniqueName: string
     ) =
     ElmishStore.Create((Program.mkProgram init update (fun _ _ -> ())), arg, uniqueName)
 
@@ -126,7 +155,7 @@ type ElmishStore =
     (
       init: unit -> 'model * Cmd<'msg>,
       update: 'msg -> 'model -> 'model * Cmd<'msg>,
-      uniqueName
+      uniqueName: string
     ) =
     ElmishStore.Create(Program.mkProgram init update (fun _ _ -> ()), uniqueName)
 
@@ -134,6 +163,6 @@ type ElmishStore =
     (
       init: 'model * Cmd<'msg>,
       update: 'msg -> 'model -> 'model * Cmd<'msg>,
-      uniqueName
+      uniqueName: string
     ) =
     ElmishStore.Create(Program.mkProgram (fun () -> init) update (fun _ _ -> ()), uniqueName)
