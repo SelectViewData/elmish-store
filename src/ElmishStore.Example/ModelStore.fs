@@ -13,12 +13,12 @@ open Elmish.Debug
 
 let store =
   Program.mkProgram init update (fun _ _ -> ())
+  |> ElmishProgram.setup "main"
   #if DEBUG
   |> Program.withConsoleTrace
-  |> ElmishStore.createStorePostMap "main" Program.withDebugger
-  #else
-  |> ElmishStore.createStore "main"
+  |> Program.withDebugger
   #endif
+  |> ElmishProgram.run
 
 [<Hook>]
 let useSelector (selector: Model -> 'a) = React.useElmishStore (store, selector)
