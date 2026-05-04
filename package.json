@@ -9,10 +9,8 @@
         "start": "dotnet fable watch ./src/ElmishStore.Example --outDir ./src/ElmishStore.Example/.fable-build --run vite"
     },
     "devDependencies": {
-        "@tailwindcss/postcss": "^4.2.2",
+        "@tailwindcss/vite": "^4.2.2",
         "@vitejs/plugin-react": "^6.0.1",
-        "autoprefixer": "^10.4.27",
-        "postcss": "^8.5.9",
         "remotedev": "^0.2.9",
         "tailwindcss": "^4.2.2",
         "vite": "^8.0.8"

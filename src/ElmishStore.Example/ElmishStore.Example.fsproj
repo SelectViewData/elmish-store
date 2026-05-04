@@ -4,14 +4,8 @@
         <TargetFramework>net8.0</TargetFramework>
     </PropertyGroup>
     <ItemGroup>
-        <Content Include="..\..\tailwind.config.js">
-          <Link>tailwind.config.js</Link>
-        </Content>
         <Content Include="..\..\vite.config.js">
           <Link>vite.config.js</Link>
-        </Content>
-        <Content Include="..\..\postcss.config.js">
-          <Link>postcss.config.js</Link>
         </Content>
         <Content Include="..\..\package.json">
           <Link>package.json</Link>
