@@ -6,7 +6,7 @@
       <PackageTags>fsharp;fable;react;elmish</PackageTags>
       <Authors>Łukasz Krzywizna</Authors>
       <Company>SelectView Data Solutions</Company>
-      <Version>0.1.0</Version>
+      <Version>0.2.0</Version>
       <TargetFramework>net8.0</TargetFramework>
       <PackageReadmeFile>readme.md</PackageReadmeFile>
       <RepositoryUrl>https://github.com/SelectViewData/elmish-store</RepositoryUrl>
@@ -28,8 +28,8 @@
       <Content Include="..\..\readme.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Fable.Elmish" Version="4.1.0" />
-    <PackageReference Include="Feliz" Version="2.7.0" />
-    <PackageReference Include="Feliz.CompilerPlugins" Version="2.2.0" />
+    <PackageReference Include="Fable.Elmish" Version="5.0.2" />
+    <PackageReference Include="Feliz" Version="3.2.0" />
+    <PackageReference Include="Feliz.CompilerPlugins" Version="3.1.0" />
   </ItemGroup>
 </Project>

@@ -1,9 +1,13 @@
 ﻿import { defineConfig } from 'vite'
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
 /** @type {import('vite').UserConfig} */
 export default defineConfig({
-    plugins: [react({ jsxRuntime: 'classic'})], // jsxRuntime: 'classic' is required for fast-refresh for .js files
+    plugins: [
+        tailwindcss(),
+        react({ jsxRuntime: 'classic' }),
+    ], // jsxRuntime: 'classic' is required for fast-refresh for .js files
     root: "./src/ElmishStore.Example",
     server: {
         port: 8080,

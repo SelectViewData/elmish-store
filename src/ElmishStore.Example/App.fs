@@ -4,4 +4,4 @@ open Feliz
 
 ReactDOM
   .createRoot(Browser.Dom.document.getElementById "elmish-app")
-  .render (React.strictMode [ View.AppView() ])
+  .render (React.StrictMode [ View.AppView() ])
