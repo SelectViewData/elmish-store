@@ -3,7 +3,6 @@ namespace ElmishStore
 
 open Elmish
 open Fable.Core
-open ElmishStore
 open System.Collections.Generic
 
 type ElmishStore<'model, 'msg> = {
@@ -12,165 +11,151 @@ type ElmishStore<'model, 'msg> = {
   Subscribe: UseSyncExternalStoreSubscribe
 }
 
-type private ActiveStoreState<'model> = {
-  GetModel: unit -> 'model
-  SetTermination: bool -> unit
-}
-
-type private RunningStoreEntry = {
-  StoreState: obj
-}
-
-type private PreparedStoreEntry = {
-  SetStateToken: obj
-  StoreState: obj
-}
-
-type private StoreLifecycle =
-  | Prepared of PreparedStoreEntry
-  | Running of RunningStoreEntry
-
-type private PendingStoreState<'model, 'msg> = {
+type private StoreState<'model, 'msg> = {
   Store: ElmishStore<'model, 'msg>
   SetTermination: bool -> unit
 }
 
+type private RuntimeState<'model, 'msg> = {
+  UniqueName: string
+  mutable State: 'model option
+  mutable FinalDispatch: Dispatch<'msg> option
+  mutable ShouldTerminate: bool
+  Subscribers: ResizeArray<unit -> unit>
+  mutable PreviousStore: StoreState<'model, 'msg> option
+}
+
+type ElmishProgramState<'arg, 'model, 'msg, 'view> = {
+  Program: Program<'arg, 'model, 'msg, 'view>
+  Run: Program<'arg, 'model, 'msg, 'view> -> 'arg -> ElmishStore<'model, 'msg>
+}
+
 module private Internal =
 
-  let mutable stores: Dictionary<string, StoreLifecycle> = Dictionary<string, StoreLifecycle>()
+  let mutable stores: Dictionary<string, obj> = Dictionary<string, obj>()
 
-  let tryGetActiveStoreState (uniqueName: string) =
-    match stores.TryGetValue uniqueName with
-    | true, Running storeState ->
-      Some(storeState.StoreState |> unbox<ActiveStoreState<'model>>)
-    | _ -> None
+  let tryGetStoreState (uniqueName: string) =
+    if stores.ContainsKey(uniqueName) then
+      Some(stores[uniqueName] |> unbox<StoreState<'model, 'msg>>)
+    else
+      None
 
-  let setup
-    (uniqueName: string)
-    (program: Program<'arg, 'model, 'msg, unit>)
-    =
+module ElmishProgram =
 
-    let mutable state: 'model option = None
-    let mutable finalDispatch = None
-    let mutable shouldTerminate = false
-    let mutable previousStoreState = tryGetActiveStoreState uniqueName
-
-    let setTermination should = shouldTerminate <- should
+  let setup (uniqueName: string) (program: Program<'arg, 'model, 'msg, 'view>) =
+    let runtime = {
+      UniqueName = uniqueName
+      State = None
+      FinalDispatch = None
+      ShouldTerminate = false
+      Subscribers = ResizeArray()
+      PreviousStore = None
+    }
 
     let dispatch msg =
-      match finalDispatch with
+      match runtime.FinalDispatch with
       | Some finalDispatch -> finalDispatch msg
       | None -> failwith "You're using initial dispatch. That shouldn't happen."
 
-    let subscribers = ResizeArray<unit -> unit>()
-
     let subscribe callback =
-      subscribers.Add(callback)
-      fun () -> subscribers.Remove(callback) |> ignore
+      runtime.Subscribers.Add(callback)
+      fun () -> runtime.Subscribers.Remove(callback) |> ignore
 
     let mapSetState setState model dispatch =
       setState model dispatch
-      let oldModel = state
-      state <- Some model
-      finalDispatch <- Some dispatch
+      let oldModel = runtime.State
+      runtime.State <- Some model
+      runtime.FinalDispatch <- Some dispatch
 
-      match previousStoreState with
+      match runtime.PreviousStore with
       | Some previousStore ->
         previousStore.SetTermination true
-        previousStoreState <- None
+        runtime.PreviousStore <- None
       | None -> ()
 
       // Skip re-renders if model hasn't changed
       if not (obj.ReferenceEquals(model, oldModel)) then
-        subscribers |> Seq.iter (fun callback -> callback ())
+        runtime.Subscribers |> Seq.iter (fun callback -> callback ())
 
     let mapInit userInit arg =
-      match previousStoreState with
+      match runtime.PreviousStore with
       | Some previousStore ->
-        let model = previousStore.GetModel()
-        state <- Some model
+        let model = previousStore.Store.GetModel()
+        runtime.State <- Some model
         model, Cmd.none
       | None -> userInit arg
 
     let mapTermination (predicate, terminate) =
-      let pred msg = predicate msg || shouldTerminate
+      let pred msg = predicate msg || runtime.ShouldTerminate
       pred, terminate
 
-    let getCurrentState () =
-      match state with
+    let getState () =
+      match runtime.State with
       | Some state -> state
       | None -> failwith "State is not initialized. That shouldn't happen."
 
     let store = {
-      GetModel = getCurrentState
+      GetModel = getState
       Dispatch = dispatch
       Subscribe = UseSyncExternalStoreSubscribe subscribe
     }
 
     let preparedProgram =
       program
-      |> Program.map mapInit id (fun _ -> fun _ _ -> store) mapSetState id mapTermination
+      |> Program.map mapInit id id mapSetState id mapTermination
 
-    let storeState = {
-      Store = store
-      SetTermination = setTermination
-    }
+    let run (program: Program<'arg, 'model, 'msg, 'view>) (arg: 'arg) =
+      runtime.PreviousStore <- Internal.tryGetStoreState runtime.UniqueName
+      runtime.ShouldTerminate <- false
 
-    stores[uniqueName] <- Prepared {
-      SetStateToken = box (Program.setState preparedProgram)
-      StoreState = box storeState
-    }
+      let setTermination should = runtime.ShouldTerminate <- should
 
-    preparedProgram
+      program
+      |> Program.runWith arg
 
-  let takePendingStoreStateByToken (setStateToken: 'model -> Dispatch<'msg> -> unit) =
-    let matchingStoreEntry =
-      stores
-      |> Seq.tryPick (fun (KeyValue(uniqueName, storeEntryObj)) ->
-        match storeEntryObj with
-        | Prepared storeEntry when obj.ReferenceEquals(storeEntry.SetStateToken, box setStateToken) ->
-          Some(uniqueName, storeEntry)
-        | _ -> None)
-
-    match matchingStoreEntry with
-    | Some(uniqueName, storeEntry) ->
-      stores.Remove(uniqueName) |> ignore
-      Some(uniqueName, unbox<PendingStoreState<'model, 'msg>> storeEntry.StoreState)
-    | None -> None
-
-module ElmishProgram =
-
-  let setup (uniqueName: string) (program: Program<'arg, 'model, 'msg, unit>) =
-    Internal.setup uniqueName program
-
-  let runWith (arg: 'arg) (program: Program<'arg, 'model, 'msg, ElmishStore<'model, 'msg>>) =
-    let uniqueName, storeState =
-      match Internal.takePendingStoreStateByToken (Program.setState program) with
-      | Some storeState -> storeState
-      | None -> failwith "Program was not prepared. Call ElmishProgram.setup before ElmishProgram.run."
-
-    program |> Program.runWith arg
-
-    Internal.stores[uniqueName] <- Running {
-      StoreState = box {
-        GetModel = storeState.Store.GetModel
-        SetTermination = storeState.SetTermination
+      let storeState = {
+        Store = store
+        SetTermination = setTermination
       }
-    }
-    storeState.Store
 
-  let inline run (program: Program<unit, 'model, 'msg, ElmishStore<'model, 'msg>>) =
-    runWith () program
+      Internal.stores[runtime.UniqueName] <- box storeState
+      store
+
+    {
+      Program = preparedProgram
+      Run = run
+    }
+
+  let mapProgram
+    (mapper: Program<'arg, 'model, 'msg, 'view> -> Program<'arg, 'model, 'msg, 'view>)
+    (elmishProgram: ElmishProgramState<'arg, 'model, 'msg, 'view>)
+    =
+    {
+      Program = mapper elmishProgram.Program
+      Run = fun program arg -> elmishProgram.Run program arg
+    }
+
+  let runWith (arg: 'arg) (elmishProgram: ElmishProgramState<'arg, 'model, 'msg, 'view>) =
+    elmishProgram.Run elmishProgram.Program arg
+
+  let inline run (elmishProgram: ElmishProgramState<unit, 'model, 'msg, 'view>) =
+    runWith () elmishProgram
+
+  let createStoreWith (uniqueName: string) (arg: 'arg) (program: Program<'arg, 'model, 'msg, 'view>) =
+    program
+    |> setup uniqueName
+    |> runWith arg
+
+  let inline createStore (uniqueName: string) (program: Program<unit, 'model, 'msg, 'view>) =
+    createStoreWith uniqueName () program
 
 module ElmishStore =
 
-  let createStoreWith (uniqueName: string) (arg: 'arg) (program: Program<'arg, 'model, 'msg, unit>) =
-    program
-    |> ElmishProgram.setup uniqueName
-    |> ElmishProgram.runWith arg
+  let createStoreWith (uniqueName: string) (arg: 'arg) (program: Program<'arg, 'model, 'msg, 'view>) =
+    ElmishProgram.createStoreWith uniqueName arg program
 
-  let inline createStore (uniqueName: string) program : ElmishStore<'model, 'msg> =
-    createStoreWith uniqueName () program
+  let inline createStore (uniqueName: string) (program: Program<unit, 'model, 'msg, 'view>) : ElmishStore<'model, 'msg> =
+    ElmishProgram.createStore uniqueName program
 
 [<Erase>]
 type ElmishStore =

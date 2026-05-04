@@ -15,8 +15,8 @@ let store =
   Program.mkProgram init update (fun _ _ -> ())
   |> ElmishProgram.setup "main"
   #if DEBUG
-  |> Program.withConsoleTrace
-  |> Program.withDebugger
+  |> ElmishProgram.mapProgram Program.withConsoleTrace
+  |> ElmishProgram.mapProgram Program.withDebugger
   #endif
   |> ElmishProgram.run
 
